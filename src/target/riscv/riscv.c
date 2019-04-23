@@ -962,7 +962,8 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 		assert(!target->reg_cache->reg_list[i].valid ||
 				target->reg_cache->reg_list[i].size > 0);
 		(*reg_list)[i] = &target->reg_cache->reg_list[i];
-		if (read && !target->reg_cache->reg_list[i].valid) {
+// 		if (read && !target->reg_cache->reg_list[i].valid) {
+		if (read && target->reg_cache->reg_list[i].exist && !target->reg_cache->reg_list[i].valid) { //[debug]
 			if (target->reg_cache->reg_list[i].type->get(
 						&target->reg_cache->reg_list[i]) != ERROR_OK)
 				/* This function is called when first connecting to gdb,
@@ -970,6 +971,7 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 				 * probably will fail. Ignore these failures, and when
 				 * encountered stop reading to save time. */
 				read = false;
+{}
 		}
 	}
 
@@ -2246,6 +2248,7 @@ int riscv_get_register_on_hart(struct target *target, riscv_reg_t *value,
 		return ERROR_OK;
 	}
 
+    printf("[debug]: get reg %s at hartid %d\n", gdb_regno_name(regid), hartid);//[debug]
 	int result = r->get_register(target, value, hartid, regid);
 
 	LOG_DEBUG("{%d} %s: %" PRIx64, hartid, gdb_regno_name(regid), *value);
@@ -2451,6 +2454,9 @@ static int register_get(struct reg *reg)
 {
 	riscv_reg_info_t *reg_info = reg->arch_info;
 	struct target *target = reg_info->target;
+    if(!reg->exist){ //[debug]
+        return ERROR_FAIL; //[debug]
+    } //[debug]
 	uint64_t value;
 	int result = riscv_get_register(target, &value, reg->number);
 	if (result != ERROR_OK)
@@ -2848,7 +2854,7 @@ int riscv_init_registers(struct target *target)
 				case CSR_STVEC:
 				case CSR_SIP:
 				case CSR_SIE:
-				case CSR_SCOUNTEREN:
+// 				case CSR_SCOUNTEREN: //[debug]
 				case CSR_SSCRATCH:
 				case CSR_SEPC:
 				case CSR_SCAUSE:

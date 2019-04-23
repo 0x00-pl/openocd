@@ -754,7 +754,7 @@
 #define CSR_FRM 0x2
 #define CSR_FCSR 0x3
 #define CSR_CYCLE 0xc00
-#define CSR_TIME 0xc01
+// #define CSR_TIME 0xc01 //[debug] not using 
 #define CSR_INSTRET 0xc02
 #define CSR_HPMCOUNTER3 0xc03
 #define CSR_HPMCOUNTER4 0xc04
@@ -801,36 +801,36 @@
 #define CSR_MIDELEG 0x303
 #define CSR_MIE 0x304
 #define CSR_MTVEC 0x305
-#define CSR_MCOUNTEREN 0x306
+// #define CSR_MCOUNTEREN 0x306 //[debug] not using anymore
 #define CSR_MSCRATCH 0x340
 #define CSR_MEPC 0x341
 #define CSR_MCAUSE 0x342
 #define CSR_MTVAL 0x343
 #define CSR_MIP 0x344
-#define CSR_PMPCFG0 0x3a0
-#define CSR_PMPCFG1 0x3a1
-#define CSR_PMPCFG2 0x3a2
-#define CSR_PMPCFG3 0x3a3
-#define CSR_PMPADDR0 0x3b0
-#define CSR_PMPADDR1 0x3b1
-#define CSR_PMPADDR2 0x3b2
-#define CSR_PMPADDR3 0x3b3
-#define CSR_PMPADDR4 0x3b4
-#define CSR_PMPADDR5 0x3b5
-#define CSR_PMPADDR6 0x3b6
-#define CSR_PMPADDR7 0x3b7
-#define CSR_PMPADDR8 0x3b8
-#define CSR_PMPADDR9 0x3b9
-#define CSR_PMPADDR10 0x3ba
-#define CSR_PMPADDR11 0x3bb
-#define CSR_PMPADDR12 0x3bc
-#define CSR_PMPADDR13 0x3bd
-#define CSR_PMPADDR14 0x3be
-#define CSR_PMPADDR15 0x3bf
+// #define CSR_PMPCFG0 0x3a0 //[debug] not using anymore
+// #define CSR_PMPCFG1 0x3a1 //[debug] not using anymore
+// #define CSR_PMPCFG2 0x3a2 //[debug] not using anymore
+// #define CSR_PMPCFG3 0x3a3 //[debug] not using anymore
+// #define CSR_PMPADDR0 0x3b0 //[debug] not using anymore
+// #define CSR_PMPADDR1 0x3b1 //[debug] not using anymore
+// #define CSR_PMPADDR2 0x3b2 //[debug] not using anymore
+// #define CSR_PMPADDR3 0x3b3 //[debug] not using anymore
+// #define CSR_PMPADDR4 0x3b4 //[debug] not using anymore
+// #define CSR_PMPADDR5 0x3b5 //[debug] not using anymore
+// #define CSR_PMPADDR6 0x3b6 //[debug] not using anymore
+// #define CSR_PMPADDR7 0x3b7 //[debug] not using anymore
+// #define CSR_PMPADDR8 0x3b8 //[debug] not using anymore
+// #define CSR_PMPADDR9 0x3b9 //[debug] not using anymore
+// #define CSR_PMPADDR10 0x3ba //[debug] not using anymore
+// #define CSR_PMPADDR11 0x3bb //[debug] not using anymore
+// #define CSR_PMPADDR12 0x3bc //[debug] not using anymore
+// #define CSR_PMPADDR13 0x3bd //[debug] not using anymore
+// #define CSR_PMPADDR14 0x3be //[debug] not using anymore
+// #define CSR_PMPADDR15 0x3bf //[debug] not using anymore
 #define CSR_TSELECT 0x7a0
 #define CSR_TDATA1 0x7a1
 #define CSR_TDATA2 0x7a2
-#define CSR_TDATA3 0x7a3
+// #define CSR_TDATA3 0x7a3 //[debug] not using
 #define CSR_DCSR 0x7b0
 #define CSR_DPC 0x7b1
 #define CSR_DSCRATCH 0x7b2
@@ -1246,7 +1246,7 @@ DECLARE_CSR(fflags, CSR_FFLAGS)
 DECLARE_CSR(frm, CSR_FRM)
 DECLARE_CSR(fcsr, CSR_FCSR)
 DECLARE_CSR(cycle, CSR_CYCLE)
-DECLARE_CSR(time, CSR_TIME)
+// DECLARE_CSR(time, CSR_TIME)
 DECLARE_CSR(instret, CSR_INSTRET)
 DECLARE_CSR(hpmcounter3, CSR_HPMCOUNTER3)
 DECLARE_CSR(hpmcounter4, CSR_HPMCOUNTER4)
@@ -1280,7 +1280,7 @@ DECLARE_CSR(hpmcounter31, CSR_HPMCOUNTER31)
 DECLARE_CSR(sstatus, CSR_SSTATUS)
 DECLARE_CSR(sie, CSR_SIE)
 DECLARE_CSR(stvec, CSR_STVEC)
-DECLARE_CSR(scounteren, CSR_SCOUNTEREN)
+// DECLARE_CSR(scounteren, CSR_SCOUNTEREN)//[debug]
 DECLARE_CSR(sscratch, CSR_SSCRATCH)
 DECLARE_CSR(sepc, CSR_SEPC)
 DECLARE_CSR(scause, CSR_SCAUSE)
@@ -1293,36 +1293,36 @@ DECLARE_CSR(medeleg, CSR_MEDELEG)
 DECLARE_CSR(mideleg, CSR_MIDELEG)
 DECLARE_CSR(mie, CSR_MIE)
 DECLARE_CSR(mtvec, CSR_MTVEC)
-DECLARE_CSR(mcounteren, CSR_MCOUNTEREN)
+// DECLARE_CSR(mcounteren, CSR_MCOUNTEREN)//[debug]
 DECLARE_CSR(mscratch, CSR_MSCRATCH)
 DECLARE_CSR(mepc, CSR_MEPC)
 DECLARE_CSR(mcause, CSR_MCAUSE)
 DECLARE_CSR(mtval, CSR_MTVAL)
 DECLARE_CSR(mip, CSR_MIP)
-DECLARE_CSR(pmpcfg0, CSR_PMPCFG0)
-DECLARE_CSR(pmpcfg1, CSR_PMPCFG1)
-DECLARE_CSR(pmpcfg2, CSR_PMPCFG2)
-DECLARE_CSR(pmpcfg3, CSR_PMPCFG3)
-DECLARE_CSR(pmpaddr0, CSR_PMPADDR0)
-DECLARE_CSR(pmpaddr1, CSR_PMPADDR1)
-DECLARE_CSR(pmpaddr2, CSR_PMPADDR2)
-DECLARE_CSR(pmpaddr3, CSR_PMPADDR3)
-DECLARE_CSR(pmpaddr4, CSR_PMPADDR4)
-DECLARE_CSR(pmpaddr5, CSR_PMPADDR5)
-DECLARE_CSR(pmpaddr6, CSR_PMPADDR6)
-DECLARE_CSR(pmpaddr7, CSR_PMPADDR7)
-DECLARE_CSR(pmpaddr8, CSR_PMPADDR8)
-DECLARE_CSR(pmpaddr9, CSR_PMPADDR9)
-DECLARE_CSR(pmpaddr10, CSR_PMPADDR10)
-DECLARE_CSR(pmpaddr11, CSR_PMPADDR11)
-DECLARE_CSR(pmpaddr12, CSR_PMPADDR12)
-DECLARE_CSR(pmpaddr13, CSR_PMPADDR13)
-DECLARE_CSR(pmpaddr14, CSR_PMPADDR14)
-DECLARE_CSR(pmpaddr15, CSR_PMPADDR15)
+// DECLARE_CSR(pmpcfg0, CSR_PMPCFG0)
+// DECLARE_CSR(pmpcfg1, CSR_PMPCFG1)
+// DECLARE_CSR(pmpcfg2, CSR_PMPCFG2)
+// DECLARE_CSR(pmpcfg3, CSR_PMPCFG3)
+// DECLARE_CSR(pmpaddr0, CSR_PMPADDR0)
+// DECLARE_CSR(pmpaddr1, CSR_PMPADDR1)
+// DECLARE_CSR(pmpaddr2, CSR_PMPADDR2)
+// DECLARE_CSR(pmpaddr3, CSR_PMPADDR3)
+// DECLARE_CSR(pmpaddr4, CSR_PMPADDR4)
+// DECLARE_CSR(pmpaddr5, CSR_PMPADDR5)
+// DECLARE_CSR(pmpaddr6, CSR_PMPADDR6)
+// DECLARE_CSR(pmpaddr7, CSR_PMPADDR7)
+// DECLARE_CSR(pmpaddr8, CSR_PMPADDR8)
+// DECLARE_CSR(pmpaddr9, CSR_PMPADDR9)
+// DECLARE_CSR(pmpaddr10, CSR_PMPADDR10)
+// DECLARE_CSR(pmpaddr11, CSR_PMPADDR11)
+// DECLARE_CSR(pmpaddr12, CSR_PMPADDR12)
+// DECLARE_CSR(pmpaddr13, CSR_PMPADDR13)
+// DECLARE_CSR(pmpaddr14, CSR_PMPADDR14)
+// DECLARE_CSR(pmpaddr15, CSR_PMPADDR15)
 DECLARE_CSR(tselect, CSR_TSELECT)
 DECLARE_CSR(tdata1, CSR_TDATA1)
 DECLARE_CSR(tdata2, CSR_TDATA2)
-DECLARE_CSR(tdata3, CSR_TDATA3)
+// DECLARE_CSR(tdata3, CSR_TDATA3)
 DECLARE_CSR(dcsr, CSR_DCSR)
 DECLARE_CSR(dpc, CSR_DPC)
 DECLARE_CSR(dscratch, CSR_DSCRATCH)

@@ -972,7 +972,9 @@ static uint32_t cache_get32(struct target *target, unsigned int address)
 	if (!info->dram_cache[address].valid) {
 		info->dram_cache[address].data = dram_read32(target, address);
 		info->dram_cache[address].valid = true;
+        printf("[debug]: reading [0x%x] without cache\n", address);//[debug]
 	}
+    printf("[debug]: read [0x%x] == %x\n", address, info->dram_cache[address].data);//[debug]
 	return info->dram_cache[address].data;
 }
 
@@ -1217,6 +1219,19 @@ static int update_mstatus_actual(struct target *target)
 static int register_read(struct target *target, riscv_reg_t *value, int regnum)
 {
 	riscv011_info_t *info = get_info(target);
+    
+//     printf("[debug]: reading exception mem[0x%x] prev\n", info->dramsize-1);//[debug]
+//     // exception is set by code in debug ROM //[debug]
+// 	uint32_t exception = cache_get32(target, info->dramsize-1);//[debug]
+//     //[debug]
+// 	if (exception) {//[debug]
+// 		LOG_WARNING("Got exception 0x%x when reading %s(%d)[0x%x]", exception, gdb_regno_name(regnum), regnum, regnum);//[debug]
+// 		*value = ~0;//[debug]
+// 		return ERROR_FAIL;//[debug]
+// 	}
+// 	//[debug]
+
+    printf("[debug]: register_read reading [%s] code\n", gdb_regno_name(regnum));//[debug]
 	if (regnum >= GDB_REGNO_CSR0 && regnum <= GDB_REGNO_CSR4095) {
 		cache_set32(target, 0, csrr(S0, regnum - GDB_REGNO_CSR0));
 		cache_set_store(target, 1, S0, SLOT0);
@@ -1226,12 +1241,14 @@ static int register_read(struct target *target, riscv_reg_t *value, int regnum)
 		return ERROR_FAIL;
 	}
 
+    printf("[debug]: cache_write reading [%s] code\n", gdb_regno_name(regnum));//[debug]
 	if (cache_write(target, 4, true) != ERROR_OK)
 		return ERROR_FAIL;
 
+    // exception is set by code in debug ROM
 	uint32_t exception = cache_get32(target, info->dramsize-1);
 	if (exception) {
-		LOG_WARNING("Got exception 0x%x when reading %s", exception, gdb_regno_name(regnum));
+		LOG_WARNING("Got exception 0x%x when reading %s(%d)[0x%x]", exception, gdb_regno_name(regnum), regnum, regnum);
 		*value = ~0;
 		return ERROR_FAIL;
 	}
@@ -1313,10 +1330,13 @@ static int register_write(struct target *target, unsigned int number,
 	return ERROR_OK;
 }
 
+static void riscv011_select_hart(struct target* target, int hartid); //[debug]
 static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 		int regid)
 {
-	assert(hartid == 0);
+	//assert(hartid == 0); //[debug]
+    riscv011_select_hart(target, hartid); //[debug] set hartid
+    
 	riscv011_info_t *info = get_info(target);
 
 	maybe_write_tselect(target);
@@ -1366,12 +1386,42 @@ static int set_register(struct target *target, int hartid, int regid,
 	return register_write(target, regid, value);
 }
 
-static int halt(struct target *target)
+static void riscv011_select_hart(struct target* target, int hartid)
 {
-	LOG_DEBUG("riscv_halt()");
-	jtag_add_ir_scan(target->tap, &select_dbus, TAP_IDLE);
+	RISCV_INFO(r);
+	if (r->current_hartid != hartid)
+	{
+		r->current_hartid = hartid;
+		uint64_t dmcontrol = dbus_read(target, DMCONTROL);
+        printf("[debug]: select_hart %lu => %d  0x%09lx\n", get_field(dmcontrol, DMCONTROL_HARTID), hartid, dmcontrol);//[debug]
+        
+		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, r->current_hartid);
+		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, 1);//[debug]
+		dbus_write(target, DMCONTROL, dmcontrol);
+        
+        while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
+            printf("[debug] warn write dmcontrol failed, rewriting.\n");//[debug]
+            dbus_write(target, DMCONTROL, dmcontrol);//[debug]
+        }
+	}
+}
 
-	cache_set32(target, 0, csrsi(CSR_DCSR, DCSR_HALT));
+static int halt(struct target *target, int hartid)
+{
+	LOG_DEBUG("riscv_halt(%d)", hartid);
+    riscv011_select_hart(target, hartid); //[debug] set hartid
+    
+	jtag_add_ir_scan(target->tap, &select_dbus, TAP_IDLE);
+    
+//     //[debug]+4
+// 	cache_set32(target, 0, csrsi(CSR_DCSR, DCSR_HALT));
+// 	cache_set32(target, 1, csrr(S0, CSR_MHARTID));
+// 	cache_set32(target, 2, sw(S0, ZERO, SETHALTNOT));
+// 	cache_set32(target, 3, csrr(S0, CSR_DCSR));
+//     cache_set_store(target, 4, S0, SLOT0);
+// 	cache_set_jump(target, 5);
+    
+    cache_set32(target, 0, csrsi(CSR_DCSR, DCSR_HALT));
 	cache_set32(target, 1, csrr(S0, CSR_MHARTID));
 	cache_set32(target, 2, sw(S0, ZERO, SETHALTNOT));
 	cache_set_jump(target, 3);
@@ -1380,9 +1430,38 @@ static int halt(struct target *target)
 		LOG_ERROR("cache_write() failed.");
 		return ERROR_FAIL;
 	}
+	
+//     uint64_t value = cache_get(target, SLOT0);//[debug]
+//     printf("[debug]: dcsr[DCSR_HALT]: 0x%lx\n", value&DCSR_HALT);//[debug]
+//     assert((value&DCSR_HALT) != 0);
+
+// 	//[debug]
+// 	uint64_t value;//[debug]
+//     do{//[debug]
+//         if(register_read(target, &value, CSR_DCSR) != ERROR_OK){//[debug]
+//             printf("[debug] halt: cannot read dcsr.\n");//[debug]
+//             continue;//[debug]
+//         }//[debug]
+//         if(!(value & DCSR_HALT)){//[debug]
+//             printf("[debug] halt: not halted.\n");//[debug]
+//             continue;//[debug]
+//         }//[debug]
+//         break;//[debug]
+//     }while(true);//[debug]
+    
 
 	return ERROR_OK;
 }
+
+//[debug]
+static int riscv011_halt(struct target *target){
+    int ret = ERROR_OK;
+    ret = halt(target, 0);
+    ret = halt(target, 1);
+// 	target->state = TARGET_HALTED; //[debug] this will be overwrite
+	return ret;
+}
+
 
 static int init_target(struct command_context *cmd_ctx,
 		struct target *target)
@@ -1398,6 +1477,7 @@ static int init_target(struct command_context *cmd_ctx,
 
 	/* Assume 32-bit until we discover the real value in examine(). */
 	generic_info->xlen[0] = 32;
+	generic_info->xlen[1] = 32; //[debug]
 	riscv_init_registers(target);
 
 	return ERROR_OK;
@@ -1529,6 +1609,7 @@ static int examine(struct target *target)
 
 	/* Pretend this is a 32-bit system until we have found out the true value. */
 	r->xlen[0] = 32;
+	r->xlen[1] = 32; //[debug]
 
 	/* Figure out XLEN, and test writing all of Debug RAM while we're at it. */
 	cache_set32(target, 0, xori(S1, ZERO, -1));
@@ -1557,10 +1638,13 @@ static int examine(struct target *target)
 	riscv_info_t *generic_info = (riscv_info_t *) target->arch_info;
 	if (word0 == 1 && word1 == 0) {
 		generic_info->xlen[0] = 32;
+		generic_info->xlen[1] = 32;//[debug]
 	} else if (word0 == 0xffffffff && word1 == 3) {
 		generic_info->xlen[0] = 64;
+		generic_info->xlen[1] = 64;//[debug]
 	} else if (word0 == 0xffffffff && word1 == 0xffffffff) {
 		generic_info->xlen[0] = 128;
+		generic_info->xlen[1] = 128;//[debug]
 	} else {
 		uint32_t exception = cache_get32(target, info->dramsize-1);
 		LOG_ERROR("Failed to discover xlen; word0=0x%x, word1=0x%x, exception=0x%x",
@@ -1831,6 +1915,7 @@ static int handle_halt(struct target *target, bool announce)
 {
 	riscv011_info_t *info = get_info(target);
 	target->state = TARGET_HALTED;
+    printf("[debug]: state changed to TARGET_HALTED\n");//[debug]
 
 	riscv_error_t re;
 	do {
@@ -1919,8 +2004,9 @@ static int poll_target(struct target *target, bool announce)
 			return handle_halt(target, announce);
 	} else if (!bits.haltnot && bits.interrupt) {
 		/* Target is halting. There is no state for that, so don't change anything. */
-		LOG_DEBUG("halting");
+		LOG_DEBUG("halting core %d", target->coreid);
 	} else if (!bits.haltnot && !bits.interrupt) {
+        printf("[debug]: state changed to TARGET_RUNNING\n");//[debug]
 		target->state = TARGET_RUNNING;
 	}
 
@@ -1955,7 +2041,17 @@ static int riscv011_resume(struct target *target, int current,
 			return result;
 	}
 
-	return resume(target, debug_execution, false);
+// 	return resume(target, debug_execution, false);
+
+    int ret;//[debug]
+	LOG_DEBUG("riscv_resume(%d)", 0);//[debug]
+    riscv011_select_hart(target, 0); //[debug] set hartid
+    if((ret=resume(target, debug_execution, false)) != ERROR_OK){//[debug]
+        return ret;//[debug]
+    }//[debug]
+	LOG_DEBUG("riscv_resume(%d)", 0);//[debug]
+    riscv011_select_hart(target, 0); //[debug] set hartid
+    return resume(target, debug_execution, false);//[debug]
 }
 
 static int assert_reset(struct target *target)
@@ -2314,7 +2410,7 @@ struct target_type riscv011_target = {
 	/* poll current target status */
 	.poll = riscv011_poll,
 
-	.halt = halt,
+	.halt = riscv011_halt, //[debug]
 	.resume = riscv011_resume,
 	.step = step,
 
