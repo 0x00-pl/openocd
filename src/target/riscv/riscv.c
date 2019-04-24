@@ -2248,7 +2248,7 @@ int riscv_get_register_on_hart(struct target *target, riscv_reg_t *value,
 		return ERROR_OK;
 	}
 
-    printf("[debug]: get reg %s at hartid %d\n", gdb_regno_name(regid), hartid);//[debug]
+    LOG_DEBUG("[debug]: get reg %s at hartid %d\n", gdb_regno_name(regid), hartid);//[debug]
 	int result = r->get_register(target, value, hartid, regid);
 
 	LOG_DEBUG("{%d} %s: %" PRIx64, hartid, gdb_regno_name(regid), *value);

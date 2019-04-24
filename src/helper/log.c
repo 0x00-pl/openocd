@@ -267,7 +267,7 @@ void log_init(void)
 	/* set defaults for daemon configuration,
 	 * if not set by cmdline or cfgfile */
 	if (debug_level == -1)
-		debug_level = LOG_LVL_DEBUG;
+		debug_level = LOG_LVL_INFO;
 
 	char *debug_env = getenv("OPENOCD_DEBUG_LEVEL");
 	if (NULL != debug_env) {

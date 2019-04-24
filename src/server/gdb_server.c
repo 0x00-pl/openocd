@@ -2623,7 +2623,7 @@ static int gdb_query_packet(struct connection *connection,
 			return ERROR_OK;
 		}
 
-        printf("[debug]: qSupported::gdb_put_packet: <%s>\n", buffer);//[debug]
+        LOG_DEBUG("[debug]: qSupported::gdb_put_packet: <%s>\n", buffer);//[debug]
 		gdb_put_packet(connection, buffer, strlen(buffer));
 		free(buffer);
 

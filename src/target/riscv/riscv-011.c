@@ -972,9 +972,9 @@ static uint32_t cache_get32(struct target *target, unsigned int address)
 	if (!info->dram_cache[address].valid) {
 		info->dram_cache[address].data = dram_read32(target, address);
 		info->dram_cache[address].valid = true;
-        printf("[debug]: reading [0x%x] without cache\n", address);//[debug]
+        LOG_DEBUG("[debug]: reading [0x%x] without cache\n", address);//[debug]
 	}
-    printf("[debug]: read [0x%x] == %x\n", address, info->dram_cache[address].data);//[debug]
+    LOG_DEBUG("[debug]: read [0x%x] == %x\n", address, info->dram_cache[address].data);//[debug]
 	return info->dram_cache[address].data;
 }
 
@@ -1219,19 +1219,8 @@ static int update_mstatus_actual(struct target *target)
 static int register_read(struct target *target, riscv_reg_t *value, int regnum)
 {
 	riscv011_info_t *info = get_info(target);
-    
-//     printf("[debug]: reading exception mem[0x%x] prev\n", info->dramsize-1);//[debug]
-//     // exception is set by code in debug ROM //[debug]
-// 	uint32_t exception = cache_get32(target, info->dramsize-1);//[debug]
-//     //[debug]
-// 	if (exception) {//[debug]
-// 		LOG_WARNING("Got exception 0x%x when reading %s(%d)[0x%x]", exception, gdb_regno_name(regnum), regnum, regnum);//[debug]
-// 		*value = ~0;//[debug]
-// 		return ERROR_FAIL;//[debug]
-// 	}
-// 	//[debug]
 
-    printf("[debug]: register_read reading [%s] code\n", gdb_regno_name(regnum));//[debug]
+    LOG_DEBUG("[debug]: register_read reading [%s] code\n", gdb_regno_name(regnum));//[debug]
 	if (regnum >= GDB_REGNO_CSR0 && regnum <= GDB_REGNO_CSR4095) {
 		cache_set32(target, 0, csrr(S0, regnum - GDB_REGNO_CSR0));
 		cache_set_store(target, 1, S0, SLOT0);
@@ -1241,7 +1230,7 @@ static int register_read(struct target *target, riscv_reg_t *value, int regnum)
 		return ERROR_FAIL;
 	}
 
-    printf("[debug]: cache_write reading [%s] code\n", gdb_regno_name(regnum));//[debug]
+    LOG_DEBUG("[debug]: cache_write reading [%s] code\n", gdb_regno_name(regnum));//[debug]
 	if (cache_write(target, 4, true) != ERROR_OK)
 		return ERROR_FAIL;
 
@@ -1393,14 +1382,14 @@ static void riscv011_select_hart(struct target* target, int hartid)
 	{
 		r->current_hartid = hartid;
 		uint64_t dmcontrol = dbus_read(target, DMCONTROL);
-        printf("[debug]: select_hart %lu => %d  0x%09lx\n", get_field(dmcontrol, DMCONTROL_HARTID), hartid, dmcontrol);//[debug]
+        LOG_DEBUG("[debug]: select_hart %lu => %d  0x%09lx\n", get_field(dmcontrol, DMCONTROL_HARTID), hartid, dmcontrol);//[debug]
         
 		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, r->current_hartid);
 		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, 1);//[debug]
 		dbus_write(target, DMCONTROL, dmcontrol);
         
         while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
-            printf("[debug] warn write dmcontrol failed, rewriting.\n");//[debug]
+            LOG_WARNING("[debug] write dmcontrol failed, rewriting.\n");//[debug]
             dbus_write(target, DMCONTROL, dmcontrol);//[debug]
         }
 	}
@@ -1458,7 +1447,6 @@ static int riscv011_halt(struct target *target){
     int ret = ERROR_OK;
     ret = halt(target, 0);
     ret = halt(target, 1);
-// 	target->state = TARGET_HALTED; //[debug] this will be overwrite
 	return ret;
 }
 
@@ -1915,7 +1903,7 @@ static int handle_halt(struct target *target, bool announce)
 {
 	riscv011_info_t *info = get_info(target);
 	target->state = TARGET_HALTED;
-    printf("[debug]: state changed to TARGET_HALTED\n");//[debug]
+    LOG_DEBUG("[debug]: state changed to TARGET_HALTED\n");//[debug]
 
 	riscv_error_t re;
 	do {
@@ -2006,7 +1994,7 @@ static int poll_target(struct target *target, bool announce)
 		/* Target is halting. There is no state for that, so don't change anything. */
 		LOG_DEBUG("halting core %d", target->coreid);
 	} else if (!bits.haltnot && !bits.interrupt) {
-        printf("[debug]: state changed to TARGET_RUNNING\n");//[debug]
+        LOG_DEBUG("[debug]: state changed to TARGET_RUNNING\n");//[debug]
 		target->state = TARGET_RUNNING;
 	}
 
