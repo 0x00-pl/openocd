@@ -931,8 +931,8 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 		enum target_register_class reg_class, bool read)
 {
 	RISCV_INFO(r);
-	LOG_DEBUG("rtos_hartid=%d, current_hartid=%d, reg_class=%d, read=%d",
-			r->rtos_hartid, r->current_hartid, reg_class, read);
+	LOG_DEBUG("rtos_hartid=%d, current_hartid=%d, coreid=%d, reg_class=%d, read=%d",
+			r->rtos_hartid, r->current_hartid, target->coreid, reg_class, read);
 
 	if (!target->reg_cache) {
 		LOG_ERROR("Target not initialized. Return ERROR_FAIL.");
@@ -941,6 +941,7 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 
 	if (riscv_select_current_hart(target) != ERROR_OK)
 		return ERROR_FAIL;
+    
 
 	switch (reg_class) {
 		case REG_CLASS_GENERAL:
@@ -2149,7 +2150,11 @@ int riscv_set_current_hartid(struct target *target, int hartid)
 		return ERROR_OK;
 
 	int previous_hartid = riscv_current_hartid(target);
-	r->current_hartid = hartid;
+    if(previous_hartid == hartid){//[debug]
+        return ERROR_OK;
+    }//[debug]
+// 	r->current_hartid = hartid;//[debug] old code
+	target->coreid = hartid;//[debug]
 	assert(riscv_hart_enabled(target, hartid));
 	LOG_DEBUG("setting hartid to %d, was %d", hartid, previous_hartid);
 	if (r->select_current_hart(target) != ERROR_OK)

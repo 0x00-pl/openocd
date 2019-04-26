@@ -399,13 +399,39 @@ int rtos_thread_packet(struct connection *connection, char const *packet, int pa
 			int size;
 			size = snprintf(buffer, 19, "QC%016" PRIx64, target->rtos->current_thread);
 			gdb_put_packet(connection, buffer, size);
-		} else
-			gdb_put_packet(connection, "QC0", 3);
+		} else{
+// 			gdb_put_packet(connection, "QC0", 3);//[debug] old code
+            char buffer[30];//[debug]
+            int size;//[debug]
+            size = snprintf(buffer, 30, "QCp210.%d", target->coreid+1);//[debug]
+			gdb_put_packet(connection, buffer, size);//[debug]
+        }
 		return ERROR_OK;
 	} else if (packet[0] == 'T') {	/* Is thread alive? */
 		threadid_t threadid;
 		int found = -1;
-		sscanf(packet, "T%" SCNx64, &threadid);
+        //[debug][start]
+        if(packet[1]=='p'){
+            char *endp;
+            packet += 2;
+            packet_size -= 2;
+            int64_t process_id = strtoll(packet, &endp, 16); (void)process_id;
+            if (endp != NULL) {
+                packet_size -= endp - packet;
+                packet = endp;
+                // skip '.'
+                packet += 1;
+                packet_size -= 1;
+            }
+            threadid = strtoll(packet, &endp, 16);
+            if(threadid == 1 || threadid == 2){
+                found = threadid;
+            }
+        //[debug][end]
+        }else{//[debug]
+            sscanf(packet, "T%" SCNx64, &threadid);
+        }//[debug]
+        
 		if ((target->rtos != NULL) && (target->rtos->thread_details != NULL)) {
 			int thread_num;
 			for (thread_num = 0; thread_num < target->rtos->thread_count; thread_num++) {
@@ -432,6 +458,25 @@ int rtos_thread_packet(struct connection *connection, char const *packet, int pa
 			else
 				target->rtos->current_threadid = threadid;
 		}
+		
+		if((packet[1] == 'g') && (target->rtos == NULL)){//[debug]
+			threadid_t threadid;//[debug]
+			if(packet[2] == 'p'){
+                uint64_t process_id;
+                sscanf(packet, "Hgp%16lx.%16" SCNx64, &process_id, &threadid);//[debug]
+            }else{
+                sscanf(packet, "Hg%16" SCNx64, &threadid);//[debug]
+            }
+			if (threadid != 0){//[debug]
+                target->coreid = threadid-1;//[debug]
+            }//[debug]
+        }//[debug]
+		//[debug] ignore Hc, let gdb try vCont 
+		if(packet[1]=='c'){//[debug]
+            gdb_put_packet(connection, "", 0);//[debug]
+            return ERROR_OK;//[debug]
+        }//[debug]
+        
 		gdb_put_packet(connection, "OK", 2);
 		return ERROR_OK;
 	}

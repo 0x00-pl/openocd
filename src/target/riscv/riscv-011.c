@@ -95,6 +95,7 @@
 #define DTMCONTROL_IDLE				(7<<10)
 #define DTMCONTROL_ADDRBITS			(0xf<<4)
 #define DTMCONTROL_VERSION			(0xf)
+// #define DTMCONTROL_HARTID			(0xff<<2) //[debug]
 
 #define DBUS						0x11
 #define DBUS_OP_START				0
@@ -853,8 +854,20 @@ static int cache_write(struct target *target, unsigned int address, bool run)
 
 	if (last == info->dramsize) {
 		/* Nothing needs to be written to RAM. */
-		dbus_write(target, DMCONTROL, DMCONTROL_HALTNOT | (run ? DMCONTROL_INTERRUPT : 0));
+// 		dbus_write(target, DMCONTROL, DMCONTROL_HALTNOT | (run ? DMCONTROL_INTERRUPT : 0)); //[debug] old code
 
+		uint64_t dmcontrol = dbus_read(target, DMCONTROL);//[debug]
+        
+		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, target->coreid);//[debug]
+		dmcontrol = set_field(dmcontrol, DMCONTROL_HALTNOT, 1);//[debug]
+		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, (run ? 1 : 0));//[debug]
+		dbus_write(target, DMCONTROL, dmcontrol);
+        
+        while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
+            LOG_WARNING("[debug] write dmcontrol failed, rewriting.\n");//[debug]
+            dbus_write(target, DMCONTROL, dmcontrol);//[debug]
+        }//[debug]
+	
 	} else {
 		for (unsigned int i = 0; i < info->dramsize; i++) {
 			if (info->dram_cache[i].dirty) {
@@ -1147,12 +1160,24 @@ static int execute_resume(struct target *target, bool step)
 	return ERROR_OK;
 }
 
+static void riscv011_select_hart(struct target* target, int hartid); //[debug]
 /* Execute a step, and wait for reentry into Debug Mode. */
 static int full_step(struct target *target, bool announce)
 {
-	int result = execute_resume(target, true);
-	if (result != ERROR_OK)
-		return result;
+// 	int result = execute_resume(target, true);//[debug] old code
+// 	if (result != ERROR_OK)//[debug] old code
+// 		return result;//[debug] old code
+    
+	int result; //[debug]
+    result = execute_resume(target, true); //[debug]
+	if (result != ERROR_OK) //[debug]
+		return result; //[debug]
+    int other_coreid = 1- target->coreid; //[debug]
+    riscv011_select_hart(target, other_coreid); //[debug] set hartid
+    result = execute_resume(target, false); //[debug]
+	if (result != ERROR_OK) //[debug]
+		return result; //[debug]
+    
 	time_t start = time(NULL);
 	while (1) {
 		result = poll_target(target, announce);
@@ -1319,7 +1344,6 @@ static int register_write(struct target *target, unsigned int number,
 	return ERROR_OK;
 }
 
-static void riscv011_select_hart(struct target* target, int hartid); //[debug]
 static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 		int regid)
 {
@@ -1375,6 +1399,7 @@ static int set_register(struct target *target, int hartid, int regid,
 	return register_write(target, regid, value);
 }
 
+static riscv_error_t handle_halt_routine(struct target *target);
 static void riscv011_select_hart(struct target* target, int hartid)
 {
 	RISCV_INFO(r);
@@ -1388,11 +1413,17 @@ static void riscv011_select_hart(struct target* target, int hartid)
 		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, 1);//[debug]
 		dbus_write(target, DMCONTROL, dmcontrol);
         
+        
         while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
             LOG_WARNING("[debug] write dmcontrol failed, rewriting.\n");//[debug]
             dbus_write(target, DMCONTROL, dmcontrol);//[debug]
         }
+        handle_halt_routine(target);//[debug]
 	}
+}
+static int riscv011_select_current_hart(struct target* target){
+    riscv011_select_hart(target, target->coreid);
+    return ERROR_OK;
 }
 
 static int halt(struct target *target, int hartid)
@@ -1458,6 +1489,7 @@ static int init_target(struct command_context *cmd_ctx,
 	riscv_info_t *generic_info = (riscv_info_t *) target->arch_info;
 	generic_info->get_register = get_register;
 	generic_info->set_register = set_register;
+    generic_info->select_current_hart = riscv011_select_current_hart;
 
 	generic_info->version_specific = calloc(1, sizeof(riscv011_info_t));
 	if (!generic_info->version_specific)
@@ -1534,6 +1566,7 @@ static int step(struct target *target, int current, target_addr_t address,
 	return ERROR_OK;
 }
 
+
 static int examine(struct target *target)
 {
 	/* Don't need to select dbus, since the first thing we do is read dtmcontrol. */
@@ -1554,7 +1587,8 @@ static int examine(struct target *target)
 	}
 
 	RISCV_INFO(r);
-	r->hart_count = 1;
+// 	r->hart_count = 1;
+	r->hart_count = 2;//[debug]
 
 	riscv011_info_t *info = get_info(target);
 	info->addrbits = get_field(dtmcontrol, DTMCONTROL_ADDRBITS);
@@ -1994,7 +2028,9 @@ static int poll_target(struct target *target, bool announce)
 		/* Target is halting. There is no state for that, so don't change anything. */
 		LOG_DEBUG("halting core %d", target->coreid);
 	} else if (!bits.haltnot && !bits.interrupt) {
-        LOG_DEBUG("[debug]: state changed to TARGET_RUNNING\n");//[debug]
+        if(target->state != TARGET_RUNNING){//[debug]
+            LOG_DEBUG("[debug]: state changed to TARGET_RUNNING\n");//[debug]
+        }//[debug]
 		target->state = TARGET_RUNNING;
 	}
 
@@ -2037,8 +2073,8 @@ static int riscv011_resume(struct target *target, int current,
     if((ret=resume(target, debug_execution, false)) != ERROR_OK){//[debug]
         return ret;//[debug]
     }//[debug]
-	LOG_DEBUG("riscv_resume(%d)", 0);//[debug]
-    riscv011_select_hart(target, 0); //[debug] set hartid
+	LOG_DEBUG("riscv_resume(%d)", 1);//[debug]
+    riscv011_select_hart(target, 1); //[debug] set hartid
     return resume(target, debug_execution, false);//[debug]
 }
 

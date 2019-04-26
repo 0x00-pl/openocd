@@ -483,6 +483,10 @@ int gdb_put_packet(struct connection *connection, char *buffer, int len)
 	gdb_con->busy = true;
 	int retval = gdb_put_packet_inner(connection, buffer, len);
 	gdb_con->busy = false;
+    
+    if(len<1000){//[debug]
+        LOG_DEBUG("gdb put packet: '%s'\n", buffer);//[debug]
+    }//[debug]
 
 	/* we sent some data, reset timer for keep alive messages */
 	kept_alive();
@@ -2469,6 +2473,12 @@ static int gdb_generate_thread_list(struct target *target, char **thread_list_ou
 				   "</thread>\n");
 		}
 	}
+	else{//[debug]
+			xml_printf(&retval, &thread_list, &pos, &size,
+				   "<thread id=\"p210.1\" core=\"0\">\ncore0\n</thread>\n");
+			xml_printf(&retval, &thread_list, &pos, &size,
+				   "<thread id=\"p210.2\" core=\"1\">\ncore1\n</thread>\n");
+    }
 
 	xml_printf(&retval, &thread_list, &pos, &size,
 		   "</threads>\n");
@@ -2613,7 +2623,7 @@ static int gdb_query_packet(struct connection *connection,
 			&buffer,
 			&pos,
 			&size,
-			"PacketSize=%x;qXfer:memory-map:read%c;qXfer:features:read%c;qXfer:threads:read+;QStartNoAckMode+;vContSupported+",
+			"PacketSize=%x;qXfer:memory-map:read%c;qXfer:features:read%c;qXfer:threads:read+;QStartNoAckMode+;vContSupported+;multiprocess+",
 			(GDB_BUFFER_SIZE - 1),
 			((gdb_use_memory_map == 1) && (flash_get_bank_count() > 0)) ? '+' : '-',
 			(gdb_target_desc_supported == 1) ? '+' : '-');
@@ -2623,7 +2633,7 @@ static int gdb_query_packet(struct connection *connection,
 			return ERROR_OK;
 		}
 
-        LOG_DEBUG("[debug]: qSupported::gdb_put_packet: <%s>\n", buffer);//[debug]
+//         LOG_DEBUG("[debug]: qSupported::gdb_put_packet: <%s>\n", buffer);//[debug]
 		gdb_put_packet(connection, buffer, strlen(buffer));
 		free(buffer);
 
@@ -2765,6 +2775,22 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 
 			parse += 2;
 			packet_size -= 2;
+            
+            //[debug][start]
+            // skip process_id
+            if(parse[0]=='p'){
+                parse += 1;
+                packet_size -= 1;
+                int64_t process_id = strtoll(parse, &endp, 16); (void)process_id;
+                if (endp != NULL) {
+                    packet_size -= endp - parse;
+                    parse = endp;
+                    // skip '.'
+                    parse += 1;
+                    packet_size -= 1;
+                }
+            }
+            //[debug][end]
 
 			thread_id = strtoll(parse, &endp, 16);
 			if (endp != NULL) {
@@ -2799,7 +2825,23 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 						int64_t tid;
 						parse += 1;
 						packet_size -= 1;
-
+                        
+                        //[debug][start]
+                        // skip process_id
+                        if(parse[0]=='p'){
+                            parse += 1;
+                            packet_size -= 1;
+                            int64_t process_id = strtoll(parse, &endp, 16); (void)process_id;
+                            if (endp != NULL) {
+                                packet_size -= endp - parse;
+                                parse = endp;
+                                // skip '.'
+                                parse += 1;
+                                packet_size -= 1;
+                            }
+                        }
+                        //[debug][end]
+            
 						tid = strtoll(parse, &endp, 16);
 						if (tid == thread_id) {
 							/*
