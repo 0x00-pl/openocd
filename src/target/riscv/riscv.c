@@ -517,8 +517,11 @@ static int add_trigger(struct target *target, struct trigger *trigger)
 	return ERROR_OK;
 }
 
+
+static int riscv_select_current_hart(struct target *target);//[debug]
 int riscv_add_breakpoint(struct target *target, struct breakpoint *breakpoint)
 {
+    riscv_select_current_hart(target);//[debug]
 	LOG_DEBUG("[%d] @0x%" TARGET_PRIxADDR, target->coreid, breakpoint->address);
 	assert(breakpoint);
 	if (breakpoint->type == BKPT_SOFT) {
@@ -904,8 +907,9 @@ static int riscv_select_current_hart(struct target *target)
 		if (r->rtos_hartid == -1)
 			r->rtos_hartid = target->rtos->current_threadid - 1;
 		return riscv_set_current_hartid(target, r->rtos_hartid);
-	} else
+	} else {
 		return riscv_set_current_hartid(target, target->coreid);
+    }
 }
 
 static int riscv_read_memory(struct target *target, target_addr_t address,
@@ -963,8 +967,8 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 		assert(!target->reg_cache->reg_list[i].valid ||
 				target->reg_cache->reg_list[i].size > 0);
 		(*reg_list)[i] = &target->reg_cache->reg_list[i];
-// 		if (read && !target->reg_cache->reg_list[i].valid) {
-		if (read && target->reg_cache->reg_list[i].exist && !target->reg_cache->reg_list[i].valid) { //[debug]
+		if (read && !target->reg_cache->reg_list[i].valid) {
+// 		if (read && target->reg_cache->reg_list[i].exist && !target->reg_cache->reg_list[i].valid) { //[debug]
 			if (target->reg_cache->reg_list[i].type->get(
 						&target->reg_cache->reg_list[i]) != ERROR_OK)
 				/* This function is called when first connecting to gdb,
@@ -972,7 +976,6 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 				 * probably will fail. Ignore these failures, and when
 				 * encountered stop reading to save time. */
 				read = false;
-{}
 		}
 	}
 
@@ -2153,8 +2156,7 @@ int riscv_set_current_hartid(struct target *target, int hartid)
     if(previous_hartid == hartid){//[debug]
         return ERROR_OK;
     }//[debug]
-// 	r->current_hartid = hartid;//[debug] old code
-	target->coreid = hartid;//[debug]
+	r->current_hartid = hartid;
 	assert(riscv_hart_enabled(target, hartid));
 	LOG_DEBUG("setting hartid to %d, was %d", hartid, previous_hartid);
 	if (r->select_current_hart(target) != ERROR_OK)

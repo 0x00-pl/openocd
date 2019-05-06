@@ -25,6 +25,7 @@
 #include "helper/log.h"
 #include "helper/binarybuffer.h"
 #include "server/gdb_server.h"
+#include <target/riscv/riscv.h> //[debug]
 
 /* RTOSs */
 extern struct rtos_type FreeRTOS_rtos;
@@ -469,6 +470,8 @@ int rtos_thread_packet(struct connection *connection, char const *packet, int pa
             }
 			if (threadid != 0){//[debug]
                 target->coreid = threadid-1;//[debug]
+                riscv_info_t *generic_info = (riscv_info_t *) target->arch_info;//[debug]
+                generic_info->select_current_hart(target);//[debug]
             }//[debug]
         }//[debug]
 		//[debug] ignore Hc, let gdb try vCont 

@@ -180,7 +180,8 @@ typedef struct {
 	/* Number of words in Debug RAM. */
 	unsigned int dramsize;
 	uint64_t dcsr;
-	uint64_t dpc;
+// 	uint64_t dpc;//[debug] old code
+	uint64_t dpc_notused;//[debug]
 	uint64_t tselect;
 	bool tselect_dirty;
 	/* The value that mstatus actually has on the target right now. This is not
@@ -856,15 +857,15 @@ static int cache_write(struct target *target, unsigned int address, bool run)
 		/* Nothing needs to be written to RAM. */
 // 		dbus_write(target, DMCONTROL, DMCONTROL_HALTNOT | (run ? DMCONTROL_INTERRUPT : 0)); //[debug] old code
 
-		uint64_t dmcontrol = dbus_read(target, DMCONTROL);//[debug]
+		uint64_t dmcontrol = 0;
         
-		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, target->coreid);//[debug]
+		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, riscv_info(target)->current_hartid);//[debug]
 		dmcontrol = set_field(dmcontrol, DMCONTROL_HALTNOT, 1);//[debug]
 		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, (run ? 1 : 0));//[debug]
 		dbus_write(target, DMCONTROL, dmcontrol);
         
         while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
-            LOG_WARNING("[debug] write dmcontrol failed, rewriting.\n");//[debug]
+//             LOG_WARNING("[debug] write dmcontrol failed, rewriting.\n");//[debug]
             dbus_write(target, DMCONTROL, dmcontrol);//[debug]
         }//[debug]
 	
@@ -985,7 +986,6 @@ static uint32_t cache_get32(struct target *target, unsigned int address)
 	if (!info->dram_cache[address].valid) {
 		info->dram_cache[address].data = dram_read32(target, address);
 		info->dram_cache[address].valid = true;
-        LOG_DEBUG("[debug]: reading [0x%x] without cache\n", address);//[debug]
 	}
     LOG_DEBUG("[debug]: read [0x%x] == %x\n", address, info->dram_cache[address].data);//[debug]
 	return info->dram_cache[address].data;
@@ -1108,14 +1108,21 @@ static int execute_resume(struct target *target, bool step)
 
 	maybe_write_tselect(target);
 
-	/* TODO: check if dpc is dirty (which also is true if an exception was hit
-	 * at any time) */
-	cache_set_load(target, 0, S0, SLOT0);
-	cache_set32(target, 1, csrw(S0, CSR_DPC));
-	cache_set_jump(target, 2);
-	cache_set(target, SLOT0, info->dpc);
-	if (cache_write(target, 4, true) != ERROR_OK)
-		return ERROR_FAIL;
+    uint64_t dpc = 0xcccccccc;//[debug]
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", riscv_info(target)->current_hartid, dpc);//[debug]
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", riscv_info(target)->current_hartid, dpc);//[debug]
+    //[debug] old code [start]
+// 	/* TODO: check if dpc is dirty (which also is true if an exception was hit
+// 	 * at any time) */
+// 	cache_set_load(target, 0, S0, SLOT0);
+// 	cache_set32(target, 1, csrw(S0, CSR_DPC));
+// 	cache_set_jump(target, 2);
+// 	cache_set(target, SLOT0, info->dpc);
+// 	if (cache_write(target, 4, true) != ERROR_OK)
+// 		return ERROR_FAIL;
+    //[debug] old code [end]
 
 	struct reg *mstatus_reg = &target->reg_cache->reg_list[GDB_REGNO_MSTATUS];
 	if (mstatus_reg->valid) {
@@ -1154,7 +1161,8 @@ static int execute_resume(struct target *target, bool step)
 		return ERROR_FAIL;
 	}
 
-	target->state = TARGET_RUNNING;
+// 	target->state = TARGET_RUNNING; //[debug] old code
+//     LOG_DEBUG("[debug]: state changed to TARGET_RUNNING\n");//[debug]
 	register_cache_invalidate(target->reg_cache);
 
 	return ERROR_OK;
@@ -1169,14 +1177,20 @@ static int full_step(struct target *target, bool announce)
 // 		return result;//[debug] old code
     
 	int result; //[debug]
-    result = execute_resume(target, true); //[debug]
-	if (result != ERROR_OK) //[debug]
-		return result; //[debug]
-    int other_coreid = 1- target->coreid; //[debug]
-    riscv011_select_hart(target, other_coreid); //[debug] set hartid
+	
+//     riscv011_select_hart(target, target->coreid); //[debug] set hartid
+//     result = execute_resume(target, true); //[debug]
+// 	if (result != ERROR_OK) //[debug]
+// 		return result; //[debug]
+//     int other_coreid = 1- target->coreid; //[debug]
+//     riscv011_select_hart(target, other_coreid); //[debug] set hartid
+//     result = execute_resume(target, false); //[debug]
+// 	if (result != ERROR_OK) //[debug]
+// 		return result; //[debug]
+
+
+    riscv011_select_hart(target, target->coreid); //[debug] set hartid
     result = execute_resume(target, false); //[debug]
-	if (result != ERROR_OK) //[debug]
-		return result; //[debug]
     
 	time_t start = time(NULL);
 	while (1) {
@@ -1244,6 +1258,11 @@ static int update_mstatus_actual(struct target *target)
 static int register_read(struct target *target, riscv_reg_t *value, int regnum)
 {
 	riscv011_info_t *info = get_info(target);
+    
+    if(regnum==GDB_REGNO_PC){//[debug]
+        regnum = GDB_REGNO_DPC;//[debug]
+    }//[debug]
+    
 
     LOG_DEBUG("[debug]: register_read reading [%s] code\n", gdb_regno_name(regnum));//[debug]
 	if (regnum >= GDB_REGNO_CSR0 && regnum <= GDB_REGNO_CSR4095) {
@@ -1283,6 +1302,11 @@ static int register_write(struct target *target, unsigned int number,
 	riscv011_info_t *info = get_info(target);
 
 	maybe_write_tselect(target);
+    
+    if(number==GDB_REGNO_PC){//[debug]
+        number = GDB_REGNO_DPC;//[debug]
+    }//[debug]
+    
 
 	if (number == S0) {
 		cache_set_load(target, 0, S0, SLOT0);
@@ -1296,7 +1320,8 @@ static int register_write(struct target *target, unsigned int number,
 		cache_set_load(target, 0, number - GDB_REGNO_ZERO, SLOT0);
 		cache_set_jump(target, 1);
 	} else if (number == GDB_REGNO_PC) {
-		info->dpc = value;
+// 		info->dpc = value;//[debug] old code
+        assert(0);//[debug]: should not use this branch.
 		return ERROR_OK;
 	} else if (number >= GDB_REGNO_FPR0 && number <= GDB_REGNO_FPR31) {
 		int result = update_mstatus_actual(target);
@@ -1347,17 +1372,27 @@ static int register_write(struct target *target, unsigned int number,
 static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 		int regid)
 {
-	//assert(hartid == 0); //[debug]
-    riscv011_select_hart(target, hartid); //[debug] set hartid
+	//assert(hartid == 0); //[debug] old code
+    if(riscv_info(target)->current_hartid != hartid) riscv011_select_hart(target, hartid); //[debug] set hartid
     
 	riscv011_info_t *info = get_info(target);
 
 	maybe_write_tselect(target);
+        if(regid==GDB_REGNO_PC){//[debug]
+        regid = GDB_REGNO_DPC;//[debug]
+    }//[debug]
+    
+    LOG_DEBUG("[debug]: get_register %s %s\n", gdb_regno_name(regid), regid<=GDB_REGNO_XPR31? "from cache" : "");//[debug]
 
 	if (regid <= GDB_REGNO_XPR31) {
 		*value = reg_cache_get(target, regid);
 	} else if (regid == GDB_REGNO_PC) {
-		*value = info->dpc;
+        assert(0);//[debug] should not use this branch
+// 		*value = info->dpc;//[debug] old code
+// 		int result = register_read(target, value, GDB_REGNO_DPC);//[debug]
+// //         LOG_DEBUG("[debug]: read dpc %p", (void*)*value);//[debug]
+// 		if (result != ERROR_OK)//[debug]
+// 			return result;//[debug]
 	} else if (regid >= GDB_REGNO_FPR0 && regid <= GDB_REGNO_FPR31) {
 		int result = update_mstatus_actual(target);
 		if (result != ERROR_OK)
@@ -1395,15 +1430,21 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 static int set_register(struct target *target, int hartid, int regid,
 		uint64_t value)
 {
-	assert(hartid == 0);
-	return register_write(target, regid, value);
+// 	assert(hartid == 0);//[debug] old code
+    if(riscv_info(target)->current_hartid != hartid) riscv011_select_hart(target, hartid);//[debug]
+	int ret = register_write(target, regid, value);
+    uint64_t value_back=0xcccccccc;//[debug]
+    uint64_t dmcontrol = dbus_read(target, DMCONTROL);//[debug]
+    register_read(target, &value_back, regid);//[debug]
+    LOG_DEBUG("[debug] %s[%ld][%d] set 0x%lx get 0x%lx", gdb_regno_name(regid), get_field(dmcontrol, DMCONTROL_HARTID), riscv_info(target)->current_hartid, value, value_back);//[debug]
+    return ret;
 }
 
 static riscv_error_t handle_halt_routine(struct target *target);
 static void riscv011_select_hart(struct target* target, int hartid)
 {
 	RISCV_INFO(r);
-	if (r->current_hartid != hartid)
+// 	if (r->current_hartid != hartid)//[debug] old code
 	{
 		r->current_hartid = hartid;
 		uint64_t dmcontrol = dbus_read(target, DMCONTROL);
@@ -1413,23 +1454,39 @@ static void riscv011_select_hart(struct target* target, int hartid)
 		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, 1);//[debug]
 		dbus_write(target, DMCONTROL, dmcontrol);
         
-        
+        dbus_read(target, DMCONTROL);//[debug]
         while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
-            LOG_WARNING("[debug] write dmcontrol failed, rewriting.\n");//[debug]
+            LOG_WARNING("[debug] write dmcontrol 1 failed, rewriting.\n");//[debug]
+            dbus_write(target, DMCONTROL, dmcontrol);//[debug]
+        }       
+        while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
+            LOG_WARNING("[debug] write dmcontrol 2 failed, rewriting.\n");//[debug]
             dbus_write(target, DMCONTROL, dmcontrol);//[debug]
         }
+        LOG_DEBUG("[debug] dmcontrol[hart %d]: 0x%lx", r->current_hartid, dbus_read(target, DMCONTROL));//[debug]
+        riscv_invalidate_register_cache(target);//[debug]
+        int old_debug_level = debug_level;//[debug]
+        debug_level = LOG_LVL_INFO;//[debug]
         handle_halt_routine(target);//[debug]
+        debug_level = old_debug_level;//[debug]
 	}
+    uint64_t dpc = 0xcccccccc;//[debug]
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
 }
+//[debug]
 static int riscv011_select_current_hart(struct target* target){
-    riscv011_select_hart(target, target->coreid);
+	RISCV_INFO(r);
+    riscv011_select_hart(target, r->current_hartid);
     return ERROR_OK;
 }
 
 static int halt(struct target *target, int hartid)
 {
 	LOG_DEBUG("riscv_halt(%d)", hartid);
-    riscv011_select_hart(target, hartid); //[debug] set hartid
+    if(riscv_info(target)->current_hartid != hartid) riscv011_select_hart(target, hartid); //[debug] set hartid
     
 	jtag_add_ir_scan(target->tap, &select_dbus, TAP_IDLE);
     
@@ -1478,6 +1535,14 @@ static int riscv011_halt(struct target *target){
     int ret = ERROR_OK;
     ret = halt(target, 0);
     ret = halt(target, 1);
+    
+    uint64_t dpc = 0xcccccccc;//[debug]
+    riscv011_select_hart(target, 0); //[debug] set hartid
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[0]: 0x%lx", dpc);//[debug]
+    riscv011_select_hart(target, 1); //[debug] set hartid
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[1]: 0x%lx", dpc);//[debug]
 	return ret;
 }
 
@@ -1709,6 +1774,7 @@ static int examine(struct target *target)
 
 static riscv_error_t handle_halt_routine(struct target *target)
 {
+    LOG_DEBUG("-");//[debug]
 	riscv011_info_t *info = get_info(target);
 
 	scans_t *scans = scans_new(target, 256);
@@ -1906,6 +1972,7 @@ static riscv_error_t handle_halt_routine(struct target *target)
 					result++;
 				}
 			}
+// 			LOG_DEBUG("[debug]: reg_cache_set reg%d = %lx", reg, data);//[debug]
 		}
 	}
 
@@ -1921,7 +1988,10 @@ static riscv_error_t handle_halt_routine(struct target *target)
 	}
 
 	/* TODO: get rid of those 2 variables and talk to the cache directly. */
-	info->dpc = reg_cache_get(target, CSR_DPC);
+// 	info->dpc = reg_cache_get(target, CSR_DPC);//[debug] old code
+    uint64_t dpc = 0xcccccccc;//[debug]
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc: 0x%lx", dpc);//[debug]
 	info->dcsr = reg_cache_get(target, CSR_DCSR);
 
 	cache_invalidate(target);
@@ -1936,8 +2006,10 @@ error:
 static int handle_halt(struct target *target, bool announce)
 {
 	riscv011_info_t *info = get_info(target);
+    if(target->state != TARGET_HALTED){//[debug]
+        LOG_DEBUG("[debug]: state changed to TARGET_HALTED\n");//[debug]
+    }//[debug]
 	target->state = TARGET_HALTED;
-    LOG_DEBUG("[debug]: state changed to TARGET_HALTED\n");//[debug]
 
 	riscv_error_t re;
 	do {
@@ -2001,39 +2073,97 @@ static int handle_halt(struct target *target, bool announce)
 	 * 'monitor reset init'. At that time gdb appears to have the pc cached
 	 * still so if a user manually inspects the pc it will still have the old
 	 * value. */
-	LOG_USER("halted at 0x%" PRIx64 " due to %s", info->dpc, cause_string[cause]);
+// 	LOG_USER("halted at 0x%" PRIx64 " due to %s", info->dpc, cause_string[cause]);//[debug] old code
+    uint64_t dpc = 0xcccccccc;//[debug]
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+	LOG_USER("halted at dpc 0x%" PRIx64 " due to %s", dpc, cause_string[cause]);//[debug]
 
 	return ERROR_OK;
 }
 
-static int poll_target(struct target *target, bool announce)
-{
-	jtag_add_ir_scan(target->tap, &select_dbus, TAP_IDLE);
+// static int poll_target_old_code(struct target *target, bool announce)
+// {
+// 	jtag_add_ir_scan(target->tap, &select_dbus, TAP_IDLE);
+// 
+// 	/* Inhibit debug logging during poll(), which isn't usually interesting and
+// 	 * just fills up the screen/logs with clutter. */
+// 	int old_debug_level = debug_level;
+// 	if (debug_level >= LOG_LVL_DEBUG)
+// 		debug_level = LOG_LVL_INFO;
+// 	bits_t bits = read_bits(target);
+// 	debug_level = old_debug_level;
+// 
+// 	if (bits.haltnot && bits.interrupt) {
+// 		target->state = TARGET_DEBUG_RUNNING;
+// 		LOG_DEBUG("debug running");
+// 	} else if (bits.haltnot && !bits.interrupt) {
+// 		if (target->state != TARGET_HALTED)
+// 			return handle_halt(target, announce);
+// 	} else if (!bits.haltnot && bits.interrupt) {
+// 		/* Target is halting. There is no state for that, so don't change anything. */
+// 		LOG_DEBUG("halting core %d", target->coreid);
+// 	} else if (!bits.haltnot && !bits.interrupt) {
+//         if(target->state != TARGET_RUNNING){//[debug]
+//             LOG_DEBUG("[debug]: state changed to TARGET_RUNNING\n");//[debug]
+//         }//[debug]
+// 		target->state = TARGET_RUNNING;
+// 	}
+// 
+// 	return ERROR_OK;
+// }
 
+
+//[debug]
+static bits_t get_bits(uint64_t value){
+    return (bits_t){
+		.haltnot = get_field(value, DMCONTROL_HALTNOT),
+		.interrupt = get_field(value, DMCONTROL_INTERRUPT)
+	};
+}
+//[debug]
+static int poll_target(struct target *target, bool announce){
 	/* Inhibit debug logging during poll(), which isn't usually interesting and
 	 * just fills up the screen/logs with clutter. */
 	int old_debug_level = debug_level;
-	if (debug_level >= LOG_LVL_DEBUG)
-		debug_level = LOG_LVL_INFO;
-	bits_t bits = read_bits(target);
+	if (debug_level >= LOG_LVL_DEBUG){
+// 		debug_level = LOG_LVL_INFO;//[debug] old code
+    }
+    
+    riscv011_select_hart(target, 0);
+//     jtag_add_ir_scan(target->tap, &select_dbus, TAP_IDLE);
+    uint64_t core0_dmcontrol = dbus_read(target, DMCONTROL);
+    bits_t core0_bits = get_bits(core0_dmcontrol);
+    
+    if(get_field(core0_dmcontrol, DMCONTROL_HARTID) != 0){
+        LOG_ERROR("[debug]: core0 dmcontrol.hartid is not 0 but %lx", get_field(core0_dmcontrol, DMCONTROL_HARTID));
+    }
+    
+    riscv011_select_hart(target, 1);
+//     jtag_add_ir_scan(target->tap, &select_dbus, TAP_IDLE);
+    uint64_t core1_dmcontrol = dbus_read(target, DMCONTROL);
+    bits_t core1_bits = get_bits(core1_dmcontrol);
+    
 	debug_level = old_debug_level;
-
-	if (bits.haltnot && bits.interrupt) {
-		target->state = TARGET_DEBUG_RUNNING;
-		LOG_DEBUG("debug running");
-	} else if (bits.haltnot && !bits.interrupt) {
-		if (target->state != TARGET_HALTED)
-			return handle_halt(target, announce);
-	} else if (!bits.haltnot && bits.interrupt) {
-		/* Target is halting. There is no state for that, so don't change anything. */
-		LOG_DEBUG("halting core %d", target->coreid);
-	} else if (!bits.haltnot && !bits.interrupt) {
-        if(target->state != TARGET_RUNNING){//[debug]
-            LOG_DEBUG("[debug]: state changed to TARGET_RUNNING\n");//[debug]
+    
+    if(get_field(core1_dmcontrol, DMCONTROL_HARTID) != 1){
+        LOG_ERROR("[debug]: core1 dmcontrol.hartid is not 1 but %lx", get_field(core1_dmcontrol, DMCONTROL_HARTID));
+    }
+    if(core0_bits.haltnot && core1_bits.haltnot){
+        if(core0_bits.interrupt || core1_bits.interrupt){
+            target->state = TARGET_DEBUG_RUNNING;
+            LOG_DEBUG("[debug]: state changed to TARGET_DEBUG_RUNNING");
+        }else{
+            if (target->state != TARGET_HALTED){
+                return handle_halt(target, announce);
+            }
+        }
+    }else{
+        if(target->state != TARGET_RUNNING || core0_bits.haltnot != core1_bits.haltnot){//[debug]
+            LOG_DEBUG("[debug]: state changed to TARGET_RUNNING %d %d\n", core0_bits.haltnot, core1_bits.haltnot);//[debug]
         }//[debug]
 		target->state = TARGET_RUNNING;
-	}
-
+    }
+    
 	return ERROR_OK;
 }
 
