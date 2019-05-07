@@ -1250,7 +1250,8 @@ static int update_mstatus_actual(struct target *target)
 	/* Force reading the register. In that process mstatus_actual will be
 	 * updated. */
 	riscv_reg_t mstatus;
-	return get_register(target, &mstatus, 0, GDB_REGNO_MSTATUS);
+// 	return get_register(target, &mstatus, 0, GDB_REGNO_MSTATUS);//[debug] old code
+	return get_register(target, &mstatus, riscv_info(target)->current_hartid, GDB_REGNO_MSTATUS);//[debug] 
 }
 
 /*** OpenOCD target functions. ***/
@@ -1373,16 +1374,17 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 		int regid)
 {
 	//assert(hartid == 0); //[debug] old code
+    LOG_DEBUG("current_hartid: %d <= hartid: %d", riscv_info(target)->current_hartid, hartid);//[debug]
     if(riscv_info(target)->current_hartid != hartid) riscv011_select_hart(target, hartid); //[debug] set hartid
     
 	riscv011_info_t *info = get_info(target);
 
 	maybe_write_tselect(target);
-        if(regid==GDB_REGNO_PC){//[debug]
+    if(regid==GDB_REGNO_PC){//[debug]
         regid = GDB_REGNO_DPC;//[debug]
     }//[debug]
     
-    LOG_DEBUG("[debug]: get_register %s %s\n", gdb_regno_name(regid), regid<=GDB_REGNO_XPR31? "from cache" : "");//[debug]
+    LOG_DEBUG("[debug]: [%d]get_register %s %s\n", hartid, gdb_regno_name(regid), regid<=GDB_REGNO_XPR31? "from cache" : "");//[debug]
 
 	if (regid <= GDB_REGNO_XPR31) {
 		*value = reg_cache_get(target, regid);
@@ -1394,9 +1396,13 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 // 		if (result != ERROR_OK)//[debug]
 // 			return result;//[debug]
 	} else if (regid >= GDB_REGNO_FPR0 && regid <= GDB_REGNO_FPR31) {
+        LOG_DEBUG("-");//[debug]
 		int result = update_mstatus_actual(target);
-		if (result != ERROR_OK)
+        LOG_DEBUG("-");//[debug]
+		if (result != ERROR_OK){
+            LOG_DEBUG("-");//[debug]
 			return result;
+        }
 		unsigned i = 0;
 		if ((info->mstatus_actual & MSTATUS_FS) == 0) {
 			info->mstatus_actual = set_field(info->mstatus_actual, MSTATUS_FS, 1);
@@ -1411,8 +1417,10 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 			cache_set32(target, i++, fsd(regid - GDB_REGNO_FPR0, 0, DEBUG_RAM_START + 16));
 		cache_set_jump(target, i++);
 
-		if (cache_write(target, 4, true) != ERROR_OK)
+		if (cache_write(target, 4, true) != ERROR_OK){
+            LOG_DEBUG("-");//[debug]
 			return ERROR_FAIL;
+        }
 	} else if (regid == GDB_REGNO_PRIV) {
 		*value = get_field(info->dcsr, DCSR_PRV);
 	} else {
@@ -1420,6 +1428,8 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 		if (result != ERROR_OK)
 			return result;
 	}
+	
+    LOG_DEBUG("-");//[debug]
 
 	if (regid == GDB_REGNO_MSTATUS)
 		target->reg_cache->reg_list[regid].valid = true;
@@ -1443,6 +1453,7 @@ static int set_register(struct target *target, int hartid, int regid,
 static riscv_error_t handle_halt_routine(struct target *target);
 static void riscv011_select_hart(struct target* target, int hartid)
 {
+    uint64_t dpc = 0xcccccccc;//[debug]
 	RISCV_INFO(r);
 // 	if (r->current_hartid != hartid)//[debug] old code
 	{
@@ -1452,7 +1463,11 @@ static void riscv011_select_hart(struct target* target, int hartid)
         
 		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, r->current_hartid);
 		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, 1);//[debug]
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
 		dbus_write(target, DMCONTROL, dmcontrol);
+    read_csr(target, &dpc, CSR_DPC);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
         
         dbus_read(target, DMCONTROL);//[debug]
         while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
@@ -1463,18 +1478,25 @@ static void riscv011_select_hart(struct target* target, int hartid)
             LOG_WARNING("[debug] write dmcontrol 2 failed, rewriting.\n");//[debug]
             dbus_write(target, DMCONTROL, dmcontrol);//[debug]
         }
+//     read_csr(target, &dpc, CSR_DPC);//[debug]
+//     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
         LOG_DEBUG("[debug] dmcontrol[hart %d]: 0x%lx", r->current_hartid, dbus_read(target, DMCONTROL));//[debug]
+//     read_csr(target, &dpc, CSR_DPC);//[debug]
+//     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
         riscv_invalidate_register_cache(target);//[debug]
+//     read_csr(target, &dpc, CSR_DPC);//[debug]
+//     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
         int old_debug_level = debug_level;//[debug]
         debug_level = LOG_LVL_INFO;//[debug]
         handle_halt_routine(target);//[debug]
+//     read_csr(target, &dpc, CSR_DPC);//[debug]
+//     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
         debug_level = old_debug_level;//[debug]
 	}
-    uint64_t dpc = 0xcccccccc;//[debug]
-    read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
-    read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
+//     read_csr(target, &dpc, CSR_DPC);//[debug]
+//     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
+//     read_csr(target, &dpc, CSR_DPC);//[debug]
+//     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
 }
 //[debug]
 static int riscv011_select_current_hart(struct target* target){
@@ -2126,7 +2148,7 @@ static int poll_target(struct target *target, bool announce){
 	 * just fills up the screen/logs with clutter. */
 	int old_debug_level = debug_level;
 	if (debug_level >= LOG_LVL_DEBUG){
-// 		debug_level = LOG_LVL_INFO;//[debug] old code
+// 		debug_level = LOG_LVL_INFO;
     }
     
     riscv011_select_hart(target, 0);

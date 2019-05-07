@@ -50,6 +50,7 @@
 #include <jtag/jtag.h>
 #include "rtos/rtos.h"
 #include "target/smp.h"
+#include <target/riscv/riscv.h>
 
 /**
  * @file
@@ -1165,6 +1166,8 @@ static int gdb_get_registers_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
 	struct target *target = get_target_from_connection(connection);
+    riscv_info_t *generic_info = (riscv_info_t *) target->arch_info;//[debug]
+    generic_info->select_current_hart(target);//[debug]
 	struct reg **reg_list;
 	int reg_list_size;
 	int retval;
@@ -1236,6 +1239,8 @@ static int gdb_set_registers_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
 	struct target *target = get_target_from_connection(connection);
+    riscv_info_t *generic_info = (riscv_info_t *) target->arch_info;//[debug]
+    generic_info->select_current_hart(target);//[debug]
 	int i;
 	struct reg **reg_list;
 	int reg_list_size;
@@ -1297,6 +1302,8 @@ static int gdb_get_register_packet(struct connection *connection,
 	char const *packet, int packet_size)
 {
 	struct target *target = get_target_from_connection(connection);
+    riscv_info_t *generic_info = (riscv_info_t *) target->arch_info;//[debug]
+    generic_info->select_current_hart(target);//[debug]
 	char *reg_packet;
 	int reg_num = strtoul(packet + 1, NULL, 16);
 	struct reg **reg_list;
@@ -1345,6 +1352,8 @@ static int gdb_set_register_packet(struct connection *connection,
 	char const *packet, int packet_size)
 {
 	struct target *target = get_target_from_connection(connection);
+    riscv_info_t *generic_info = (riscv_info_t *) target->arch_info;//[debug]
+    generic_info->select_current_hart(target);//[debug]
 	char *separator;
 	uint8_t *bin_buf;
 	int reg_num = strtoul(packet + 1, &separator, 16);

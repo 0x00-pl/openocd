@@ -935,6 +935,7 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 		enum target_register_class reg_class, bool read)
 {
 	RISCV_INFO(r);
+    LOG_DEBUG("enter");//[debug]
 	LOG_DEBUG("rtos_hartid=%d, current_hartid=%d, coreid=%d, reg_class=%d, read=%d",
 			r->rtos_hartid, r->current_hartid, target->coreid, reg_class, read);
 
@@ -946,6 +947,7 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 	if (riscv_select_current_hart(target) != ERROR_OK)
 		return ERROR_FAIL;
     
+    LOG_DEBUG("-");//[debug]
 
 	switch (reg_class) {
 		case REG_CLASS_GENERAL:
@@ -979,6 +981,7 @@ static int riscv_get_gdb_reg_list_internal(struct target *target,
 		}
 	}
 
+    LOG_DEBUG("exit ok");//[debug]
 	return ERROR_OK;
 }
 
@@ -2459,6 +2462,7 @@ const char *gdb_regno_name(enum gdb_regno regno)
 
 static int register_get(struct reg *reg)
 {
+    LOG_DEBUG("-");//[debug]
 	riscv_reg_info_t *reg_info = reg->arch_info;
 	struct target *target = reg_info->target;
     if(!reg->exist){ //[debug]
@@ -2471,9 +2475,10 @@ static int register_get(struct reg *reg)
 	buf_set_u64(reg->value, 0, reg->size, value);
 	/* CSRs (and possibly other extension) registers may change value at any
 	 * time. */
-	if (reg->number <= GDB_REGNO_XPR31 ||
-			(reg->number >= GDB_REGNO_FPR0 && reg->number <= GDB_REGNO_FPR31) ||
-			reg->number == GDB_REGNO_PC)
+// 	if (reg->number <= GDB_REGNO_XPR31 ||
+// 			(reg->number >= GDB_REGNO_FPR0 && reg->number <= GDB_REGNO_FPR31) ||
+// 			reg->number == GDB_REGNO_PC)	//[debug] old code
+    if (reg->number <= GDB_REGNO_XPR31 || (reg->number >= GDB_REGNO_FPR0 && reg->number <= GDB_REGNO_FPR31)) //[debug]
 		reg->valid = true;
 	LOG_DEBUG("[%d]{%d} read 0x%" PRIx64 " from %s (valid=%d)",
 			target->coreid, riscv_current_hartid(target), value, reg->name,
@@ -2494,9 +2499,11 @@ static int register_set(struct reg *reg, uint8_t *buf)
 	struct reg *r = &target->reg_cache->reg_list[reg->number];
 	/* CSRs (and possibly other extension) registers may change value at any
 	 * time. */
+// 	if (reg->number <= GDB_REGNO_XPR31 ||
+// 			(reg->number >= GDB_REGNO_FPR0 && reg->number <= GDB_REGNO_FPR31) ||
+// 			reg->number == GDB_REGNO_PC)//[debug] old code
 	if (reg->number <= GDB_REGNO_XPR31 ||
-			(reg->number >= GDB_REGNO_FPR0 && reg->number <= GDB_REGNO_FPR31) ||
-			reg->number == GDB_REGNO_PC)
+			(reg->number >= GDB_REGNO_FPR0 && reg->number <= GDB_REGNO_FPR31))//[debug]
 		r->valid = true;
 	memcpy(r->value, buf, (r->size + 7) / 8);
 
