@@ -2227,6 +2227,13 @@ bool riscv_has_register(struct target *target, int hartid, int regid)
  * is resumed. */
 int riscv_set_register(struct target *target, enum gdb_regno r, riscv_reg_t v)
 {
+    //[debug] [start]
+    if(r == GDB_REGNO_PC && v == 0x80000000){
+        //reset all hart at init load
+        riscv_set_register_on_hart(target, 0, r, v);
+        return riscv_set_register_on_hart(target, 1, r, v);
+    }
+    //[debug] [end]
 	return riscv_set_register_on_hart(target, riscv_current_hartid(target), r, v);
 }
 

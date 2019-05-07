@@ -1396,9 +1396,7 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 // 		if (result != ERROR_OK)//[debug]
 // 			return result;//[debug]
 	} else if (regid >= GDB_REGNO_FPR0 && regid <= GDB_REGNO_FPR31) {
-        LOG_DEBUG("-");//[debug]
 		int result = update_mstatus_actual(target);
-        LOG_DEBUG("-");//[debug]
 		if (result != ERROR_OK){
             LOG_DEBUG("-");//[debug]
 			return result;
@@ -1418,7 +1416,6 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 		cache_set_jump(target, i++);
 
 		if (cache_write(target, 4, true) != ERROR_OK){
-            LOG_DEBUG("-");//[debug]
 			return ERROR_FAIL;
         }
 	} else if (regid == GDB_REGNO_PRIV) {
@@ -1428,8 +1425,6 @@ static int get_register(struct target *target, riscv_reg_t *value, int hartid,
 		if (result != ERROR_OK)
 			return result;
 	}
-	
-    LOG_DEBUG("-");//[debug]
 
 	if (regid == GDB_REGNO_MSTATUS)
 		target->reg_cache->reg_list[regid].valid = true;
@@ -2148,7 +2143,7 @@ static int poll_target(struct target *target, bool announce){
 	 * just fills up the screen/logs with clutter. */
 	int old_debug_level = debug_level;
 	if (debug_level >= LOG_LVL_DEBUG){
-// 		debug_level = LOG_LVL_INFO;
+		debug_level = LOG_LVL_INFO;
     }
     
     riscv011_select_hart(target, 0);
