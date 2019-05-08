@@ -1178,20 +1178,21 @@ static int full_step(struct target *target, bool announce)
     
 	int result; //[debug]
 	
-//     riscv011_select_hart(target, target->coreid); //[debug] set hartid
-//     result = execute_resume(target, true); //[debug]
-// 	if (result != ERROR_OK) //[debug]
-// 		return result; //[debug]
-//     int other_coreid = 1- target->coreid; //[debug]
-//     riscv011_select_hart(target, other_coreid); //[debug] set hartid
-//     result = execute_resume(target, false); //[debug]
-// 	if (result != ERROR_OK) //[debug]
-// 		return result; //[debug]
-
-
-    riscv011_select_hart(target, target->coreid); //[debug] set hartid
+    int other_coreid = 1 - target->coreid; //[debug]
+    riscv011_select_hart(target, other_coreid); //[debug] set hartid
     result = execute_resume(target, false); //[debug]
-    
+	if (result != ERROR_OK) //[debug]
+		return result; //[debug]
+    riscv011_select_hart(target, target->coreid); //[debug] set hartid
+    result = execute_resume(target, true); //[debug]
+	if (result != ERROR_OK) //[debug]
+		return result; //[debug]
+    target->state = TARGET_DEBUG_RUNNING;//[debug]
+
+
+//     riscv011_select_hart(target, target->coreid); //[debug] set hartid
+//     result = execute_resume(target, false); //[debug]
+//     
 	time_t start = time(NULL);
 	while (1) {
 		result = poll_target(target, announce);
@@ -2091,10 +2092,11 @@ static int handle_halt(struct target *target, bool announce)
 	 * 'monitor reset init'. At that time gdb appears to have the pc cached
 	 * still so if a user manually inspects the pc it will still have the old
 	 * value. */
-// 	LOG_USER("halted at 0x%" PRIx64 " due to %s", info->dpc, cause_string[cause]);//[debug] old code
     uint64_t dpc = 0xcccccccc;//[debug]
     read_csr(target, &dpc, CSR_DPC);//[debug]
-	LOG_USER("halted at dpc 0x%" PRIx64 " due to %s", dpc, cause_string[cause]);//[debug]
+// 	LOG_USER("halted at 0x%" PRIx64 " due to %s", info->dpc, cause_string[cause]);//[debug] old code
+// 	LOG_USER("halted at 0x%" PRIx64 " due to %s", dpc, cause_string[cause]);//[debug]
+    (void)cause_string;//[debug]
 
 	return ERROR_OK;
 }
@@ -2144,7 +2146,7 @@ static int poll_target(struct target *target, bool announce){
 	 * just fills up the screen/logs with clutter. */
 	int old_debug_level = debug_level;
 	if (debug_level >= LOG_LVL_DEBUG){
-// 		debug_level = LOG_LVL_INFO;
+		debug_level = LOG_LVL_INFO;
     }
     
     riscv011_select_hart(target, 0);
@@ -2236,7 +2238,7 @@ static int riscv011_resume(struct target *target, int current,
     if((ret=resume(target, debug_execution, false)) != ERROR_OK){//[debug]
         return ret;//[debug]
     }//[debug]
-    target->state = TARGET_UNKNOWN;//[debug] set state to not halt
+    target->state = TARGET_DEBUG_RUNNING;//[debug] set state to not halt
     return ERROR_OK;//[debug]
 }
 

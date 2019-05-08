@@ -783,7 +783,7 @@ static void gdb_signal_reply(struct target *target, struct connection *connectio
 		}
 		//[debug][start]
 		if (target->rtos == NULL){
-			snprintf(current_thread, sizeof(current_thread), "thread:%016x;",
+			snprintf(current_thread, sizeof(current_thread), "thread:p210.%08x;",
 					target->coreid+1);
         }
         //[debug][end]
