@@ -2175,8 +2175,10 @@ static int poll_target(struct target *target, bool announce){
             if (target->state != TARGET_HALTED){
                 LOG_DEBUG("[debug]: state changed to TARGET_HALTED %d %d", core0_bits.haltnot, core1_bits.haltnot);//[debug]
                 if(core0_bits.haltnot){
+                    halt(target, 1);
                     target->coreid = 0;
                 }else if(core1_bits.haltnot){
+                    halt(target, 0);
                     target->coreid = 1;
                 }
                 riscv011_select_current_hart(target);
