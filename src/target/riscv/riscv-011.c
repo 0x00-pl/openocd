@@ -1457,12 +1457,13 @@ static void riscv011_select_hart(struct target* target, int hartid)
         LOG_DEBUG("[debug]: select_hart %lu => %d  0x%09lx\n", get_field(dmcontrol, DMCONTROL_HARTID), hartid, dmcontrol);//[debug]
         
 		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, r->current_hartid);
+		dmcontrol = set_field(dmcontrol, DMCONTROL_HALTNOT, 1);//[debug] no effect to haltnot
 		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, 1);//[debug]
     read_csr(target, &dpc, CSR_DPC);//[debug]
     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
 		dbus_write(target, DMCONTROL, dmcontrol);
-    read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
+//     read_csr(target, &dpc, CSR_DPC);//[debug]
+//     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
         
         dbus_read(target, DMCONTROL);//[debug]
         while((dbus_read(target, DMCONTROL) & DMCONTROL_HARTID) != (dmcontrol & DMCONTROL_HARTID)){//[debug]
@@ -1475,7 +1476,7 @@ static void riscv011_select_hart(struct target* target, int hartid)
         }
 //     read_csr(target, &dpc, CSR_DPC);//[debug]
 //     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
-        LOG_DEBUG("[debug] dmcontrol[hart %d]: 0x%lx", r->current_hartid, dbus_read(target, DMCONTROL));//[debug]
+//         LOG_DEBUG("[debug] dmcontrol[hart %d]: 0x%lx", r->current_hartid, dbus_read(target, DMCONTROL));//[debug]
 //     read_csr(target, &dpc, CSR_DPC);//[debug]
 //     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
         riscv_invalidate_register_cache(target);//[debug]
@@ -2143,7 +2144,7 @@ static int poll_target(struct target *target, bool announce){
 	 * just fills up the screen/logs with clutter. */
 	int old_debug_level = debug_level;
 	if (debug_level >= LOG_LVL_DEBUG){
-		debug_level = LOG_LVL_INFO;
+// 		debug_level = LOG_LVL_INFO;
     }
     
     riscv011_select_hart(target, 0);
@@ -2165,18 +2166,26 @@ static int poll_target(struct target *target, bool announce){
     if(get_field(core1_dmcontrol, DMCONTROL_HARTID) != 1){
         LOG_ERROR("[debug]: core1 dmcontrol.hartid is not 1 but %lx", get_field(core1_dmcontrol, DMCONTROL_HARTID));
     }
-    if(core0_bits.haltnot && core1_bits.haltnot){
+    LOG_DEBUG("[debug]: state %d haltnot: %d %d  interrupt: %d %d", target->state, core0_bits.haltnot, core1_bits.haltnot, core0_bits.interrupt, core1_bits.interrupt);//[debug]
+    if(core0_bits.haltnot || core1_bits.haltnot){
         if(core0_bits.interrupt || core1_bits.interrupt){
             target->state = TARGET_DEBUG_RUNNING;
             LOG_DEBUG("[debug]: state changed to TARGET_DEBUG_RUNNING");
         }else{
             if (target->state != TARGET_HALTED){
+                LOG_DEBUG("[debug]: state changed to TARGET_HALTED %d %d", core0_bits.haltnot, core1_bits.haltnot);//[debug]
+                if(core0_bits.haltnot){
+                    target->coreid = 0;
+                }else if(core1_bits.haltnot){
+                    target->coreid = 1;
+                }
+                riscv011_select_current_hart(target);
                 return handle_halt(target, announce);
             }
         }
     }else{
         if(target->state != TARGET_RUNNING || core0_bits.haltnot != core1_bits.haltnot){//[debug]
-            LOG_DEBUG("[debug]: state changed to TARGET_RUNNING %d %d\n", core0_bits.haltnot, core1_bits.haltnot);//[debug]
+            LOG_DEBUG("[debug]: state changed to TARGET_RUNNING %d %d", core0_bits.haltnot, core1_bits.haltnot);//[debug]
         }//[debug]
 		target->state = TARGET_RUNNING;
     }
@@ -2222,7 +2231,11 @@ static int riscv011_resume(struct target *target, int current,
     }//[debug]
 	LOG_DEBUG("riscv_resume(%d)", 1);//[debug]
     riscv011_select_hart(target, 1); //[debug] set hartid
-    return resume(target, debug_execution, false);//[debug]
+    if((ret=resume(target, debug_execution, false)) != ERROR_OK){//[debug]
+        return ret;//[debug]
+    }//[debug]
+    target->state = TARGET_UNKNOWN;//[debug] set state to not halt
+    return ERROR_OK;//[debug]
 }
 
 static int assert_reset(struct target *target)
