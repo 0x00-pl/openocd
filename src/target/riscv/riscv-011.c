@@ -1455,7 +1455,7 @@ static void riscv011_select_hart(struct target* target, int hartid)
 	{
 		r->current_hartid = hartid;
 		uint64_t dmcontrol = dbus_read(target, DMCONTROL);
-        LOG_DEBUG("[debug]: select_hart %lu => %d  0x%09lx\n", get_field(dmcontrol, DMCONTROL_HARTID), hartid, dmcontrol);//[debug]
+        LOG_DEBUG("[debug]: select_hart %"SCNx64" => %d  0x%09"SCNx64, get_field(dmcontrol, DMCONTROL_HARTID), hartid, dmcontrol);//[debug]
         
 		dmcontrol = set_field(dmcontrol, DMCONTROL_HARTID, r->current_hartid);
 		dmcontrol = set_field(dmcontrol, DMCONTROL_HALTNOT, 1);//[debug] no effect to haltnot
@@ -1558,10 +1558,10 @@ static int riscv011_halt(struct target *target){
     uint64_t dpc = 0xcccccccc;//[debug]
     riscv011_select_hart(target, 0); //[debug] set hartid
     read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[0]: 0x%lx", dpc);//[debug]
+    LOG_DEBUG("[debug] dpc[0]: 0x%"SCNx64, dpc);//[debug]
     riscv011_select_hart(target, 1); //[debug] set hartid
     read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[1]: 0x%lx", dpc);//[debug]
+    LOG_DEBUG("[debug] dpc[1]: 0x%"SCNx64, dpc);//[debug]
 	return ret;
 }
 
