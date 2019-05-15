@@ -464,7 +464,7 @@ int rtos_thread_packet(struct connection *connection, char const *packet, int pa
 			threadid_t threadid;//[debug]
 			if(packet[2] == 'p'){
                 uint64_t process_id;
-                sscanf(packet, "Hgp%16lx.%16" SCNx64, &process_id, &threadid);//[debug]
+                sscanf(packet, "Hgp%16"SCNx64".%16" SCNx64, &process_id, &threadid);//[debug]
             }else{
                 sscanf(packet, "Hg%16" SCNx64, &threadid);//[debug]
             }

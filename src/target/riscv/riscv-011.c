@@ -683,7 +683,7 @@ static bits_t read_bits(struct target *target)
 	do {
 		unsigned i = 0;
 		do {
-			status = dbus_scan(target, &address_in, &value, DBUS_OP_READ, 0, 0);
+			status = dbus_scan(target, &address_in, &value, DBUS_OP_READ, 0x10, 0);
 			if (status == DBUS_STATUS_BUSY) {
 				if (address_in == (1<<info->addrbits) - 1 &&
 						value == (1ULL<<DBUS_DATA_SIZE) - 1) {
@@ -1110,9 +1110,9 @@ static int execute_resume(struct target *target, bool step)
 
     uint64_t dpc = 0xcccccccc;//[debug]
     read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", riscv_info(target)->current_hartid, dpc);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%" SCNx64, riscv_info(target)->current_hartid, dpc);//[debug]
     read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", riscv_info(target)->current_hartid, dpc);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%" SCNx64, riscv_info(target)->current_hartid, dpc);//[debug]
     //[debug] old code [start]
 // 	/* TODO: check if dpc is dirty (which also is true if an exception was hit
 // 	 * at any time) */
