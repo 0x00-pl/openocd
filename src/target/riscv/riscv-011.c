@@ -1442,7 +1442,7 @@ static int set_register(struct target *target, int hartid, int regid,
     uint64_t value_back=0xcccccccc;//[debug]
     uint64_t dmcontrol = dbus_read(target, DMCONTROL);//[debug]
     register_read(target, &value_back, regid);//[debug]
-    LOG_DEBUG("[debug] %s[%ld][%d] set 0x%"SCNx64" get 0x%"SCNx64, gdb_regno_name(regid), get_field(dmcontrol, DMCONTROL_HARTID), riscv_info(target)->current_hartid, value, value_back);//[debug]
+    LOG_DEBUG("[debug] %s[%"SCNx64"][%"SCNx64"] set 0x%"SCNx64" get 0x%"SCNx64, gdb_regno_name(regid), get_field(dmcontrol, DMCONTROL_HARTID), (uint64_t)riscv_info(target)->current_hartid, value, value_back);//[debug]
     return ret;
 }
 
