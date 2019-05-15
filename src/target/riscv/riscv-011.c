@@ -1442,7 +1442,7 @@ static int set_register(struct target *target, int hartid, int regid,
     uint64_t value_back=0xcccccccc;//[debug]
     uint64_t dmcontrol = dbus_read(target, DMCONTROL);//[debug]
     register_read(target, &value_back, regid);//[debug]
-    LOG_DEBUG("[debug] %s[%ld][%d] set 0x%lx get 0x%lx", gdb_regno_name(regid), get_field(dmcontrol, DMCONTROL_HARTID), riscv_info(target)->current_hartid, value, value_back);//[debug]
+    LOG_DEBUG("[debug] %s[%ld][%d] set 0x%"SCNx64" get 0x%"SCNx64, gdb_regno_name(regid), get_field(dmcontrol, DMCONTROL_HARTID), riscv_info(target)->current_hartid, value, value_back);//[debug]
     return ret;
 }
 
@@ -1461,7 +1461,7 @@ static void riscv011_select_hart(struct target* target, int hartid)
 		dmcontrol = set_field(dmcontrol, DMCONTROL_HALTNOT, 1);//[debug] no effect to haltnot
 		dmcontrol = set_field(dmcontrol, DMCONTROL_INTERRUPT, 1);//[debug]
     read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
+    LOG_DEBUG("[debug] dpc[%d]: 0x%"SCNx64, r->current_hartid, dpc);//[debug]
 		dbus_write(target, DMCONTROL, dmcontrol);
 //     read_csr(target, &dpc, CSR_DPC);//[debug]
 //     LOG_DEBUG("[debug] dpc[%d]: 0x%lx", r->current_hartid, dpc);//[debug]
@@ -2010,7 +2010,7 @@ static riscv_error_t handle_halt_routine(struct target *target)
 // 	info->dpc = reg_cache_get(target, CSR_DPC);//[debug] old code
     uint64_t dpc = 0xcccccccc;//[debug]
     read_csr(target, &dpc, CSR_DPC);//[debug]
-    LOG_DEBUG("[debug] dpc: 0x%lx", dpc);//[debug]
+    LOG_DEBUG("[debug] dpc: 0x%"SCNx64, dpc);//[debug]
 	info->dcsr = reg_cache_get(target, CSR_DCSR);
 
 	cache_invalidate(target);
@@ -2155,7 +2155,7 @@ static int poll_target(struct target *target, bool announce){
     bits_t core0_bits = get_bits(core0_dmcontrol);
     
     if(get_field(core0_dmcontrol, DMCONTROL_HARTID) != 0){
-        LOG_ERROR("[debug]: core0 dmcontrol.hartid is not 0 but %lx", get_field(core0_dmcontrol, DMCONTROL_HARTID));
+        LOG_ERROR("[debug]: core0 dmcontrol.hartid is not 0 but %"SCNx64, get_field(core0_dmcontrol, DMCONTROL_HARTID));
     }
     
     riscv011_select_hart(target, 1);
@@ -2166,7 +2166,7 @@ static int poll_target(struct target *target, bool announce){
 	debug_level = old_debug_level;
     
     if(get_field(core1_dmcontrol, DMCONTROL_HARTID) != 1){
-        LOG_ERROR("[debug]: core1 dmcontrol.hartid is not 1 but %lx", get_field(core1_dmcontrol, DMCONTROL_HARTID));
+        LOG_ERROR("[debug]: core1 dmcontrol.hartid is not 1 but %"SCNx64, get_field(core1_dmcontrol, DMCONTROL_HARTID));
     }
     LOG_DEBUG("[debug]: state %d haltnot: %d %d  interrupt: %d %d", target->state, core0_bits.haltnot, core1_bits.haltnot, core0_bits.interrupt, core1_bits.interrupt);//[debug]
     if(core0_bits.haltnot || core1_bits.haltnot){
