@@ -141,4 +141,4 @@ MAINTAINERCLEANFILES = \
 	%D%/texinfo.tex
 
 include src/Makefile.am
-include doc/Makefile.am
+#include doc/Makefile.am
